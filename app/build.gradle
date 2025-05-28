@@ -1,6 +1,7 @@
 apply plugin: 'com.android.application'
 
 android {
+    namespace 'com.cretin.www.expandabletextview'
     compileSdkVersion 28
     defaultConfig {
         applicationId "com.cretin.cretin.expandabletextview"
