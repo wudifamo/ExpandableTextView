@@ -9,9 +9,11 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.widget.AppCompatTextView;
+
 import android.text.DynamicLayout;
 import android.text.Layout;
 import android.text.Selection;
@@ -354,8 +356,11 @@ public class ExpandableTextView extends AppCompatTextView {
             this.post(new Runnable() {
                 @Override
                 public void run() {
-                    retryTime++;
-                    setContent(mContent.toString());
+                    if (mContent != null) {
+                        retryTime++;
+                        setContent(mContent.toString());
+                    }
+
                 }
             });
         } else {
