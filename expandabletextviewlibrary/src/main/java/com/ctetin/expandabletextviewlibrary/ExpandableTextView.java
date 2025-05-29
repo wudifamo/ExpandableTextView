@@ -301,10 +301,7 @@ public class ExpandableTextView extends AppCompatTextView {
     private void setRealContentAsync(CharSequence content) {
         new Thread(() -> {
 
-            DynamicLayout dynamicLayout =
-                    new DynamicLayout(mFormatData.getFormatedContent(), mPaint, mWidth, Layout.Alignment.ALIGN_NORMAL, 1.2f, 0.0f,
-                            true);
-            SpannableStringBuilder result = setRealContent(content, dynamicLayout);
+            SpannableStringBuilder result = setRealContent(content);
             post(() -> {
                 //清除链接点击时背景效果
                 setHighlightColor(Color.TRANSPARENT);
@@ -314,9 +311,12 @@ public class ExpandableTextView extends AppCompatTextView {
         }).start();
     }
 
-    private SpannableStringBuilder setRealContent(CharSequence content, DynamicLayout dynamicLayout) {
+    private SpannableStringBuilder setRealContent(CharSequence content) {
         // 处理给定的数据
         mFormatData = formatData(content);
+        DynamicLayout dynamicLayout =
+                new DynamicLayout(mFormatData.getFormatedContent(), mPaint, mWidth, Layout.Alignment.ALIGN_NORMAL, 1.2f, 0.0f,
+                        true);
         // 用来计算内容的大小
         mDynamicLayout = dynamicLayout;
         // 获取行数
@@ -422,247 +422,220 @@ public class ExpandableTextView extends AppCompatTextView {
      */
     private SpannableStringBuilder dealLink(FormatData formatData, boolean ignoreMore) {
         SpannableStringBuilder ssb = new SpannableStringBuilder();
-        // 获取存储的状态
+        //获取存储的状态
         if (mModel != null && mModel.getStatus() != null) {
-            boolean isHide = mModel.getStatus().equals(StatusType.STATUS_CONTRACT);
-            currentLines = isHide ? mLimitLines + (mLineCount - mLimitLines) : (mNeedContract ? mLimitLines : currentLines);
+            boolean isHide = false;
+            if (mModel.getStatus() != null) {
+                //收起
+                //展开
+                isHide = mModel.getStatus().equals(StatusType.STATUS_CONTRACT);
+            }
+            if (isHide) {
+                currentLines = mLimitLines + ((mLineCount - mLimitLines));
+            } else {
+                if (mNeedContract)
+                    currentLines = mLimitLines;
+            }
         }
+        //处理折叠操作
+        if (ignoreMore) {
+            if (currentLines < mLineCount) {
+                int index = currentLines - 1;
+                int endPosition = mDynamicLayout.getLineEnd(index);
+                int startPosition = mDynamicLayout.getLineStart(index);
+                float lineWidth = mDynamicLayout.getLineWidth(index);
 
-        // 处理折叠操作
-        if (ignoreMore && currentLines < mLineCount) {
-            int index = currentLines - 1;
-            int endPosition = mDynamicLayout.getLineEnd(index);
-            int startPosition = mDynamicLayout.getLineStart(index);
-            float lineWidth = mDynamicLayout.getLineWidth(index);
+                String endString = getHideEndContent();
 
-            String endString = getHideEndContent();
-            float endStringWidth = mPaint.measureText(endString);
-
-            // 计算原内容被截取的位置下标
-            int fitPosition = getFitPosition(endString, endPosition, startPosition, lineWidth, endStringWidth, 0);
-            String substring = formatData.getFormatedContent().substring(0, fitPosition);
-            if (substring.endsWith("\n")) {
-                substring = substring.substring(0, substring.length() - "\n".length());
-            }
-            ssb.append(substring);
-
-            if (mNeedAlwaysShowRight) {
-                addSpacesIfNeeded(ssb, index, lineWidth, endString);
-            }
-
-            // 在被截断的文字后面添加 展开 文字
-            ssb.append(endString);
-
-            int expendLength = TextUtils.isEmpty(mEndExpandContent) ? 0 : 2 + mEndExpandContent.length();
-            ssb.setSpan(new ClickableSpan() {
-                @Override
-                public void onClick(View widget) {
-                    if (needRealExpandOrContract) {
-                        if (mModel != null) {
-                            mModel.setStatus(StatusType.STATUS_CONTRACT);
-                            action(mModel.getStatus());
-                        } else {
-                            action();
-                        }
-                    }
-                    if (expandOrContractClickListener != null) {
-                        expandOrContractClickListener.onClick(StatusType.STATUS_EXPAND);
-                    }
+                //计算原内容被截取的位置下标
+                int fitPosition =
+                        getFitPosition(endString, endPosition, startPosition, lineWidth, mPaint.measureText(endString), 0);
+                String substring = formatData.getFormatedContent().substring(0, fitPosition);
+                if (substring.endsWith("\n")) {
+                    substring = substring.substring(0, substring.length() - "\n".length());
                 }
-
-                @Override
-                public void updateDrawState(TextPaint ds) {
-                    super.updateDrawState(ds);
-                    ds.setColor(mExpandTextColor);
-                    ds.setUnderlineText(false);
-                }
-            }, ssb.length() - mExpandString.length() - expendLength, ssb.length(), Spannable.SPAN_INCLUSIVE_EXCLUSIVE);
-        } else {
-            ssb.append(formatData.getFormatedContent());
-            if (mNeedContract) {
-                String endString = getExpandEndContent();
-                float endStringWidth = mPaint.measureText(endString);
+                ssb.append(substring);
 
                 if (mNeedAlwaysShowRight) {
-                    int index = mDynamicLayout.getLineCount() - 1;
-                    float lineWidth = mDynamicLayout.getLineWidth(index);
-                    addSpacesIfNeeded(ssb, index, lineWidth, endString);
+                    //计算一下最后一行有没有充满
+                    float lastLineWidth = 0;
+                    for (int i = 0; i < index; i++) {
+                        lastLineWidth += mDynamicLayout.getLineWidth(i);
+                    }
+                    lastLineWidth = lastLineWidth / (index);
+                    float emptyWidth = lastLineWidth - lineWidth - mPaint.measureText(endString);
+                    if (emptyWidth > 0) {
+                        float measureText = mPaint.measureText(Space);
+                        int count = 0;
+                        while (measureText * count < emptyWidth) {
+                            count++;
+                        }
+                        count = count - 1;
+                        for (int i = 0; i < count; i++) {
+                            ssb.append(Space);
+                        }
+                    }
                 }
 
+                //在被截断的文字后面添加 展开 文字
                 ssb.append(endString);
 
                 int expendLength = TextUtils.isEmpty(mEndExpandContent) ? 0 : 2 + mEndExpandContent.length();
                 ssb.setSpan(new ClickableSpan() {
                     @Override
                     public void onClick(View widget) {
-                        if (mModel != null) {
-                            mModel.setStatus(StatusType.STATUS_EXPAND);
-                            action(mModel.getStatus());
-                        } else {
-                            action();
+                        if (needRealExpandOrContract) {
+                            if (mModel != null) {
+                                mModel.setStatus(StatusType.STATUS_CONTRACT);
+                                action(mModel.getStatus());
+                            } else {
+                                action();
+                            }
                         }
                         if (expandOrContractClickListener != null) {
-                            expandOrContractClickListener.onClick(StatusType.STATUS_CONTRACT);
+                            expandOrContractClickListener.onClick(StatusType.STATUS_EXPAND);
                         }
                     }
 
                     @Override
                     public void updateDrawState(TextPaint ds) {
                         super.updateDrawState(ds);
-                        ds.setColor(mContractTextColor);
+                        ds.setColor(mExpandTextColor);
                         ds.setUnderlineText(false);
                     }
-                }, ssb.length() - mContractString.length() - expendLength, ssb.length(), Spannable.SPAN_INCLUSIVE_EXCLUSIVE);
+                }, ssb.length() - mExpandString.length() - expendLength, ssb.length(), Spannable.SPAN_INCLUSIVE_EXCLUSIVE);
             } else {
-                if (!TextUtils.isEmpty(mEndExpandContent)) {
-                    ssb.append(mEndExpandContent);
-                    ssb.setSpan(new ForegroundColorSpan(mEndExpandTextColor), ssb.length() - mEndExpandContent.length(), ssb.length(), Spannable.SPAN_INCLUSIVE_EXCLUSIVE);
+                ssb.append(formatData.getFormatedContent());
+                if (mNeedContract) {
+                    String endString = getExpandEndContent();
+
+                    if (mNeedAlwaysShowRight) {
+                        //计算一下最后一行有没有充满
+                        int index = mDynamicLayout.getLineCount() - 1;
+                        float lineWidth = mDynamicLayout.getLineWidth(index);
+                        float lastLineWidth = 0;
+                        for (int i = 0; i < index; i++) {
+                            lastLineWidth += mDynamicLayout.getLineWidth(i);
+                        }
+                        lastLineWidth = lastLineWidth / (index);
+                        float emptyWidth = lastLineWidth - lineWidth - mPaint.measureText(endString);
+                        if (emptyWidth > 0) {
+                            float measureText = mPaint.measureText(Space);
+                            int count = 0;
+                            while (measureText * count < emptyWidth) {
+                                count++;
+                            }
+                            count = count - 1;
+                            for (int i = 0; i < count; i++) {
+                                ssb.append(Space);
+                            }
+                        }
+                    }
+
+                    ssb.append(endString);
+
+                    int expendLength = TextUtils.isEmpty(mEndExpandContent) ? 0 : 2 + mEndExpandContent.length();
+                    ssb.setSpan(new ClickableSpan() {
+                        @Override
+                        public void onClick(View widget) {
+                            if (mModel != null) {
+                                mModel.setStatus(StatusType.STATUS_EXPAND);
+                                action(mModel.getStatus());
+                            } else {
+                                action();
+                            }
+                            if (expandOrContractClickListener != null) {
+                                expandOrContractClickListener.onClick(StatusType.STATUS_CONTRACT);
+                            }
+                        }
+
+                        @Override
+                        public void updateDrawState(TextPaint ds) {
+                            super.updateDrawState(ds);
+                            ds.setColor(mContractTextColor);
+                            ds.setUnderlineText(false);
+                        }
+                    }, ssb.length() - mContractString.length() - expendLength, ssb.length(), Spannable.SPAN_INCLUSIVE_EXCLUSIVE);
+                } else {
+                    if (!TextUtils.isEmpty(mEndExpandContent)) {
+                        ssb.append(mEndExpandContent);
+                        ssb.setSpan(new ForegroundColorSpan(mEndExpandTextColor), ssb.length() - mEndExpandContent.length(), ssb.length(), Spannable.SPAN_INCLUSIVE_EXCLUSIVE);
+                    }
                 }
             }
+        } else {
+            ssb.append(formatData.getFormatedContent());
+            if (!TextUtils.isEmpty(mEndExpandContent)) {
+                ssb.append(mEndExpandContent);
+                ssb.setSpan(new ForegroundColorSpan(mEndExpandTextColor), ssb.length() - mEndExpandContent.length(), ssb.length(), Spannable.SPAN_INCLUSIVE_EXCLUSIVE);
+            }
         }
-
-        // 处理链接或者@用户
+        //处理链接或者@用户
         List<FormatData.PositionData> positionDatas = formatData.getPositionDatas();
         for (FormatData.PositionData data : positionDatas) {
             if (ssb.length() >= data.getEnd()) {
                 if (data.getType().equals(LinkType.LINK_TYPE)) {
-                    handleLinkType(ssb, data, ignoreMore);
+                    if (mNeedExpend && ignoreMore) {
+                        int fitPosition = ssb.length() - getHideEndContent().length();
+                        if (data.getStart() < fitPosition) {
+                            SelfImageSpan imageSpan = new SelfImageSpan(mLinkDrawable, ImageSpan.ALIGN_BASELINE);
+                            //设置链接图标
+                            ssb.setSpan(imageSpan, data.getStart(), data.getStart() + 1, Spannable.SPAN_INCLUSIVE_INCLUSIVE);
+                            //设置链接文字样式
+                            int endPosition = data.getEnd();
+                            if (currentLines < mLineCount) {
+                                if (fitPosition > data.getStart() + 1 && fitPosition < data.getEnd()) {
+                                    endPosition = fitPosition;
+                                }
+                            }
+                            if (data.getStart() + 1 < fitPosition) {
+                                addUrl(ssb, data, endPosition);
+                            }
+                        }
+                    } else {
+                        SelfImageSpan imageSpan = new SelfImageSpan(mLinkDrawable, ImageSpan.ALIGN_BASELINE);
+                        //设置链接图标
+                        ssb.setSpan(imageSpan, data.getStart(), data.getStart() + 1, Spannable.SPAN_INCLUSIVE_INCLUSIVE);
+                        addUrl(ssb, data, data.getEnd());
+                    }
                 } else if (data.getType().equals(LinkType.MENTION_TYPE)) {
-                    handleMentionType(ssb, data, ignoreMore);
+                    //如果需要展开
+                    if (mNeedExpend && ignoreMore) {
+                        int fitPosition = ssb.length() - getHideEndContent().length();
+                        if (data.getStart() < fitPosition) {
+                            int endPosition = data.getEnd();
+                            if (currentLines < mLineCount) {
+                                if (fitPosition < data.getEnd()) {
+                                    endPosition = fitPosition;
+                                }
+                            }
+                            addMention(ssb, data, endPosition);
+                        }
+                    } else {
+                        addMention(ssb, data, data.getEnd());
+                    }
                 } else if (data.getType().equals(LinkType.SELF)) {
-                    handleSelfType(ssb, data, ignoreMore);
+                    //自定义
+                    //如果需要展开
+                    if (mNeedExpend && ignoreMore) {
+                        int fitPosition = ssb.length() - getHideEndContent().length();
+                        if (data.getStart() < fitPosition) {
+                            int endPosition = data.getEnd();
+                            if (currentLines < mLineCount) {
+                                if (fitPosition < data.getEnd()) {
+                                    endPosition = fitPosition;
+                                }
+                            }
+                            addSelf(ssb, data, endPosition);
+                        }
+                    } else {
+                        addSelf(ssb, data, data.getEnd());
+                    }
                 }
             }
         }
         return ssb;
     }
-
-
-    /**
-     * 如果需要，添加空格以确保展开/收起文字在最右边
-     *
-     * @param ssb       SpannableStringBuilder 对象
-     * @param index     当前行索引
-     * @param lineWidth 当前行宽度
-     * @param endString 展开/收起文字
-     */
-    private void addSpacesIfNeeded(SpannableStringBuilder ssb, int index, float lineWidth, String endString) {
-        float lastLineWidth = 0;
-        for (int i = 0; i < index; i++) {
-            lastLineWidth += mDynamicLayout.getLineWidth(i);
-        }
-        lastLineWidth = lastLineWidth / (index == 0 ? 1 : index);
-        float emptyWidth = lastLineWidth - lineWidth - mPaint.measureText(endString);
-        if (emptyWidth > 0) {
-            float measureText = mPaint.measureText(Space);
-            int count = 0;
-            while (measureText * count < emptyWidth) {
-                count++;
-            }
-            count = count - 1;
-            for (int i = 0; i < count; i++) {
-                ssb.append(Space);
-            }
-        }
-    }
-
-    /**
-     * 处理链接类型
-     *
-     * @param ssb        SpannableStringBuilder 对象
-     * @param data       位置数据
-     * @param ignoreMore 是否忽略更多
-     */
-    private void handleLinkType(SpannableStringBuilder ssb, FormatData.PositionData data, boolean ignoreMore) {
-        if (mNeedExpend && ignoreMore) {
-            int fitPosition = ssb.length() - getHideEndContent().length();
-            if (data.getStart() < fitPosition) {
-                SelfImageSpan imageSpan = new SelfImageSpan(mLinkDrawable, ImageSpan.ALIGN_BASELINE);
-                // 设置链接图标
-                ssb.setSpan(imageSpan, data.getStart(), data.getStart() + 1, Spannable.SPAN_INCLUSIVE_INCLUSIVE);
-                // 设置链接文字样式
-                int endPosition = data.getEnd();
-                if (currentLines < mLineCount) {
-                    if (fitPosition > data.getStart() + 1 && fitPosition < data.getEnd()) {
-                        endPosition = fitPosition;
-                    }
-                }
-                if (data.getStart() + 1 < fitPosition) {
-                    addUrl(ssb, data, endPosition);
-                }
-            }
-        } else {
-            SelfImageSpan imageSpan = new SelfImageSpan(mLinkDrawable, ImageSpan.ALIGN_BASELINE);
-            // 设置链接图标
-            ssb.setSpan(imageSpan, data.getStart(), data.getStart() + 1, Spannable.SPAN_INCLUSIVE_INCLUSIVE);
-            addUrl(ssb, data, data.getEnd());
-        }
-    }
-
-    /**
-     * 处理@用户类型
-     *
-     * @param ssb        SpannableStringBuilder 对象
-     * @param data       位置数据
-     * @param ignoreMore 是否忽略更多
-     */
-    private void handleMentionType(SpannableStringBuilder ssb, FormatData.PositionData data, boolean ignoreMore) {
-        if (mNeedExpend && ignoreMore) {
-            int fitPosition = ssb.length() - getHideEndContent().length();
-            if (data.getStart() < fitPosition) {
-                int endPosition = data.getEnd();
-                if (currentLines < mLineCount) {
-                    if (fitPosition < data.getEnd()) {
-                        endPosition = fitPosition;
-                    }
-                }
-                addMention(ssb, data, endPosition);
-            }
-        } else {
-            addMention(ssb, data, data.getEnd());
-        }
-    }
-
-    /**
-     * 处理自定义类型
-     *
-     * @param ssb        SpannableStringBuilder 对象
-     * @param data       位置数据
-     * @param ignoreMore 是否忽略更多
-     */
-    private void handleSelfType(SpannableStringBuilder ssb, FormatData.PositionData data, boolean ignoreMore) {
-        if (mNeedExpend && ignoreMore) {
-            int fitPosition = ssb.length() - getHideEndContent().length();
-            if (data.getStart() < fitPosition) {
-                int endPosition = data.getEnd();
-                if (currentLines < mLineCount) {
-                    if (fitPosition < data.getEnd()) {
-                        endPosition = fitPosition;
-                    }
-                }
-                addSelf(ssb, data, endPosition);
-            }
-        } else {
-            addSelf(ssb, data, data.getEnd());
-        }
-    }
-
-    /**
-     * 获取需要插入的空格
-     *
-     * @param emptyWidth
-     * @param endStringWidth
-     * @return
-     */
-    private int getFitSpaceCount(float emptyWidth, float endStringWidth) {
-        float measureText = mPaint.measureText(Space);
-        int count = 0;
-        while (endStringWidth + measureText * count < emptyWidth) {
-            count++;
-        }
-        return --count;
-    }
-
 
     /**
      * 添加自定义规则
