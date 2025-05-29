@@ -205,6 +205,10 @@ public class ExpandableTextView extends AppCompatTextView {
      * 在收回和展开前面添加的内容的字体颜色
      */
     private int mEndExpandTextColor;
+    /**
+     * 高亮关键字
+     */
+    private String highlightKeyword;
 
     //是否AttachedToWindow
     private boolean isAttached;
@@ -536,8 +540,9 @@ public class ExpandableTextView extends AppCompatTextView {
 
     /**
      * 如果需要，添加空格以确保展开/收起文字在最右边
-     * @param ssb SpannableStringBuilder 对象
-     * @param index 当前行索引
+     *
+     * @param ssb       SpannableStringBuilder 对象
+     * @param index     当前行索引
      * @param lineWidth 当前行宽度
      * @param endString 展开/收起文字
      */
@@ -563,8 +568,9 @@ public class ExpandableTextView extends AppCompatTextView {
 
     /**
      * 处理链接类型
-     * @param ssb SpannableStringBuilder 对象
-     * @param data 位置数据
+     *
+     * @param ssb        SpannableStringBuilder 对象
+     * @param data       位置数据
      * @param ignoreMore 是否忽略更多
      */
     private void handleLinkType(SpannableStringBuilder ssb, FormatData.PositionData data, boolean ignoreMore) {
@@ -595,8 +601,9 @@ public class ExpandableTextView extends AppCompatTextView {
 
     /**
      * 处理@用户类型
-     * @param ssb SpannableStringBuilder 对象
-     * @param data 位置数据
+     *
+     * @param ssb        SpannableStringBuilder 对象
+     * @param data       位置数据
      * @param ignoreMore 是否忽略更多
      */
     private void handleMentionType(SpannableStringBuilder ssb, FormatData.PositionData data, boolean ignoreMore) {
@@ -618,8 +625,9 @@ public class ExpandableTextView extends AppCompatTextView {
 
     /**
      * 处理自定义类型
-     * @param ssb SpannableStringBuilder 对象
-     * @param data 位置数据
+     *
+     * @param ssb        SpannableStringBuilder 对象
+     * @param data       位置数据
      * @param ignoreMore 是否忽略更多
      */
     private void handleSelfType(SpannableStringBuilder ssb, FormatData.PositionData data, boolean ignoreMore) {
@@ -894,6 +902,20 @@ public class ExpandableTextView extends AppCompatTextView {
             }
             datas.addAll(0, datasMention);
         }
+
+        if (!TextUtils.isEmpty(this.highlightKeyword)) {
+            List<FormatData.PositionData> datasMention = new ArrayList();
+            int highlightStart = 0;
+
+            int startIndex;
+            for (String contentData = newResult.toString(); contentData.indexOf(this.highlightKeyword, highlightStart) >= 0; highlightStart = startIndex + this.highlightKeyword.length()) {
+                startIndex = contentData.indexOf(this.highlightKeyword, highlightStart);
+                datasMention.add(new FormatData.PositionData(startIndex, startIndex + this.highlightKeyword.length(), "", LinkType.SELF));
+            }
+
+            datas.addAll(0, datasMention);
+        }
+
         if (!convert.isEmpty()) {
             String resultData = newResult.toString();
             for (Map.Entry<String, String> entry : convert.entrySet()) {
@@ -1197,5 +1219,9 @@ public class ExpandableTextView extends AppCompatTextView {
     public void setExpandOrContractClickListener(OnExpandOrContractClickListener expandOrContractClickListener, boolean needRealExpandOrContract) {
         this.expandOrContractClickListener = expandOrContractClickListener;
         this.needRealExpandOrContract = needRealExpandOrContract;
+    }
+
+    public void setHighlightKeyword(String highlightKeyword) {
+        this.highlightKeyword = highlightKeyword;
     }
 }
