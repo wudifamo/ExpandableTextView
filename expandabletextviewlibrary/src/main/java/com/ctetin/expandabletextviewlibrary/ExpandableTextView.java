@@ -63,8 +63,6 @@ public class ExpandableTextView extends AppCompatTextView {
     public static final String TARGET = IMAGE_TARGET + TEXT_TARGET;
     public static final String DEFAULT_CONTENT = "                                                                                                                                                                                                                                                                                                                           ";
 
-    private static int retryTime = 0;
-
     /**
      * http?://([-\\w\\.]+)+(:\\d+)?(/([\\w/_\\.]*(\\?\\S+)?)?)?
      */
@@ -225,19 +223,6 @@ public class ExpandableTextView extends AppCompatTextView {
         super(context, attrs, defStyleAttr);
         init(context, attrs, defStyleAttr);
         setMovementMethod(LocalLinkMovementMethod.getInstance());
-        addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
-            @Override
-            public void onViewAttachedToWindow(View v) {
-                if (isAttached == false)
-                    doSetContent();
-                isAttached = true;
-            }
-
-            @Override
-            public void onViewDetachedFromWindow(View v) {
-
-            }
-        });
     }
 
     private void init(Context context, AttributeSet attrs, int defStyleAttr) {
@@ -323,7 +308,7 @@ public class ExpandableTextView extends AppCompatTextView {
         mLineCount = mDynamicLayout.getLineCount();
 
         if (onGetLineCountListener != null) {
-            onGetLineCountListener.onGetLineCount(mLineCount, mLineCount > mLimitLines);
+            post(() -> onGetLineCountListener.onGetLineCount(mLineCount, mLineCount > mLimitLines));
         }
 
         if (!mNeedExpend || mLineCount <= mLimitLines) {
@@ -354,6 +339,16 @@ public class ExpandableTextView extends AppCompatTextView {
             doSetContent();
     }
 
+    @Override
+    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+        super.onLayout(changed, left, top, right, bottom);
+        mWidth = getWidth() - getPaddingLeft() - getPaddingRight();
+        if (!isAttached) {
+            isAttached = true;
+            doSetContent();
+        }
+    }
+
     /**
      * 实际设置内容的
      */
@@ -362,26 +357,7 @@ public class ExpandableTextView extends AppCompatTextView {
             return;
         }
         currentLines = mLimitLines;
-
-        if (mWidth <= 0) {
-            if (getWidth() > 0)
-                mWidth = getWidth() - getPaddingLeft() - getPaddingRight();
-        }
-
-        if (mWidth <= 0) {
-            if (retryTime > 10) {
-                setText(DEFAULT_CONTENT);
-            }
-            this.post(() -> {
-                if (mContent != null) {
-                    retryTime++;
-                    setContent(mContent.toString());
-                }
-
-            });
-        } else {
-            setRealContentAsync(mContent.toString());
-        }
+        setRealContentAsync(mContent.toString());
     }
 
     /**
