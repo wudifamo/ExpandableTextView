@@ -9,11 +9,6 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
-
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.appcompat.widget.AppCompatTextView;
-
 import android.text.DynamicLayout;
 import android.text.Layout;
 import android.text.Selection;
@@ -31,6 +26,10 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.widget.AppCompatTextView;
+
 import com.ctetin.expandabletextviewlibrary.app.LinkType;
 import com.ctetin.expandabletextviewlibrary.app.StatusType;
 import com.ctetin.expandabletextviewlibrary.model.ExpandableStatusFix;
@@ -44,8 +43,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import static androidx.core.util.PatternsCompat.AUTOLINK_WEB_URL;
 
 /**
  * @date: on 2018-08-24
@@ -61,7 +58,7 @@ public class ExpandableTextView extends AppCompatTextView {
     public static String TEXT_TARGET = "网页链接";
     public static final String IMAGE_TARGET = "图";
     public static final String TARGET = IMAGE_TARGET + TEXT_TARGET;
-    public static final String DEFAULT_CONTENT = "                                                                                                                                                                                                                                                                                                                           ";
+    private static final String LINK_REGEX = "(?:https?|http)://(?:[\\w_-]+(?:(?:\\.[\\w_-]+)+))(?:[\\w.,@?^=%&:/~+#-]*[\\w@?^=%&/~+#-])?";
 
     /**
      * http?://([-\\w\\.]+)+(:\\d+)?(/([\\w/_\\.]*(\\?\\S+)?)?)?
@@ -292,13 +289,15 @@ public class ExpandableTextView extends AppCompatTextView {
         setText(result);
 
 //        new Thread(() -> {
-//
 //            SpannableStringBuilder result = setRealContent(content);
-//            post(() -> {
-//                //清除链接点击时背景效果
-//                setHighlightColor(Color.TRANSPARENT);
-//                //将内容设置到控件中
-//                setText(result);
+//            handler.post(new Runnable() {
+//                @Override
+//                public void run() {
+//                    //清除链接点击时背景效果
+//                    setHighlightColor(Color.TRANSPARENT);
+//                    //将内容设置到控件中
+//                    setText(result);
+//                }
 //            });
 //        }).start();
     }
@@ -306,11 +305,9 @@ public class ExpandableTextView extends AppCompatTextView {
     private SpannableStringBuilder setRealContent(CharSequence content) {
         // 处理给定的数据
         mFormatData = formatData(content);
-        DynamicLayout dynamicLayout =
-                new DynamicLayout(mFormatData.getFormatedContent(), mPaint, mWidth, Layout.Alignment.ALIGN_NORMAL, 1.2f, 0.0f,
-                        true);
         // 用来计算内容的大小
-        mDynamicLayout = dynamicLayout;
+        mDynamicLayout = new DynamicLayout(mFormatData.getFormatedContent(), mPaint, mWidth, Layout.Alignment.ALIGN_NORMAL, 1.2f, 0.0f,
+                true);
         // 获取行数
         mLineCount = mDynamicLayout.getLineCount();
 
@@ -352,7 +349,7 @@ public class ExpandableTextView extends AppCompatTextView {
         mWidth = getWidth() - getPaddingLeft() - getPaddingRight();
         if (!isAttached) {
             isAttached = true;
-            doSetContent();
+            post(this::doSetContent);
         }
     }
 
@@ -561,24 +558,28 @@ public class ExpandableTextView extends AppCompatTextView {
                     if (mNeedExpend && ignoreMore) {
                         int fitPosition = ssb.length() - getHideEndContent().length();
                         if (data.getStart() < fitPosition) {
-                            SelfImageSpan imageSpan = new SelfImageSpan(mLinkDrawable, ImageSpan.ALIGN_BASELINE);
-                            //设置链接图标
-                            ssb.setSpan(imageSpan, data.getStart(), data.getStart() + 1, Spannable.SPAN_INCLUSIVE_INCLUSIVE);
+                            if (mNeedConvertUrl) {
+                                SelfImageSpan imageSpan = new SelfImageSpan(mLinkDrawable, ImageSpan.ALIGN_BASELINE);
+                                //设置链接图标
+                                ssb.setSpan(imageSpan, data.getStart(), data.getStart() + getUrlStartAppend(), Spannable.SPAN_INCLUSIVE_INCLUSIVE);
+                            }
                             //设置链接文字样式
                             int endPosition = data.getEnd();
                             if (currentLines < mLineCount) {
-                                if (fitPosition > data.getStart() + 1 && fitPosition < data.getEnd()) {
+                                if (fitPosition > data.getStart() + getUrlStartAppend() && fitPosition < data.getEnd()) {
                                     endPosition = fitPosition;
                                 }
                             }
-                            if (data.getStart() + 1 < fitPosition) {
+                            if (data.getStart() + getUrlStartAppend() < fitPosition) {
                                 addUrl(ssb, data, endPosition);
                             }
                         }
                     } else {
-                        SelfImageSpan imageSpan = new SelfImageSpan(mLinkDrawable, ImageSpan.ALIGN_BASELINE);
-                        //设置链接图标
-                        ssb.setSpan(imageSpan, data.getStart(), data.getStart() + 1, Spannable.SPAN_INCLUSIVE_INCLUSIVE);
+                        if (mNeedConvertUrl) {
+                            SelfImageSpan imageSpan = new SelfImageSpan(mLinkDrawable, ImageSpan.ALIGN_BASELINE);
+                            //设置链接图标
+                            ssb.setSpan(imageSpan, data.getStart(), data.getStart() + getUrlStartAppend(), Spannable.SPAN_INCLUSIVE_INCLUSIVE);
+                        }
                         addUrl(ssb, data, data.getEnd());
                     }
                 } else if (data.getType().equals(LinkType.MENTION_TYPE)) {
@@ -618,6 +619,10 @@ public class ExpandableTextView extends AppCompatTextView {
             }
         }
         return ssb;
+    }
+
+    private int getUrlStartAppend() {
+        return mNeedConvertUrl ? 1 : 0;
     }
 
     /**
@@ -696,7 +701,7 @@ public class ExpandableTextView extends AppCompatTextView {
                 ds.setColor(mLinkTextColor);
                 ds.setUnderlineText(false);
             }
-        }, data.getStart() + 1, endPosition, Spannable.SPAN_INCLUSIVE_EXCLUSIVE);
+        }, data.getStart() + getUrlStartAppend(), endPosition, Spannable.SPAN_INCLUSIVE_EXCLUSIVE);
     }
 
     /**
@@ -826,7 +831,7 @@ public class ExpandableTextView extends AppCompatTextView {
         temp = 0;
 
         if (mNeedLink) {
-            pattern = AUTOLINK_WEB_URL;
+            pattern = Pattern.compile(LINK_REGEX, Pattern.CASE_INSENSITIVE);
             matcher = pattern.matcher(content);
             while (matcher.find()) {
                 start = matcher.start();
@@ -839,9 +844,9 @@ public class ExpandableTextView extends AppCompatTextView {
                 } else {
                     String result = matcher.group();
                     String key = UUIDUtils.getUuid(result.length());
-                    datas.add(new FormatData.PositionData(newResult.length(), newResult.length() + 2 + key.length(), result, LinkType.LINK_TYPE));
+                    datas.add(new FormatData.PositionData(newResult.length(), newResult.length() + key.length(), result, LinkType.LINK_TYPE));
                     convert.put(key, result);
-                    newResult.append(" " + key + " ");
+                    newResult.append(key);
                 }
                 temp = end;
             }
