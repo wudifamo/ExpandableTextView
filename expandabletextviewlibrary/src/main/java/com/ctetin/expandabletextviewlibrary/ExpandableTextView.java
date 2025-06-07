@@ -284,16 +284,23 @@ public class ExpandableTextView extends AppCompatTextView {
 
     // 异步处理内容
     private void setRealContentAsync(CharSequence content) {
-        new Thread(() -> {
+        //异步会有闪动问题,先观察下是否还有卡顿
+        SpannableStringBuilder result = setRealContent(content);
+        //清除链接点击时背景效果
+        setHighlightColor(Color.TRANSPARENT);
+        //将内容设置到控件中
+        setText(result);
 
-            SpannableStringBuilder result = setRealContent(content);
-            post(() -> {
-                //清除链接点击时背景效果
-                setHighlightColor(Color.TRANSPARENT);
-                //将内容设置到控件中
-                setText(result);
-            });
-        }).start();
+//        new Thread(() -> {
+//
+//            SpannableStringBuilder result = setRealContent(content);
+//            post(() -> {
+//                //清除链接点击时背景效果
+//                setHighlightColor(Color.TRANSPARENT);
+//                //将内容设置到控件中
+//                setText(result);
+//            });
+//        }).start();
     }
 
     private SpannableStringBuilder setRealContent(CharSequence content) {
