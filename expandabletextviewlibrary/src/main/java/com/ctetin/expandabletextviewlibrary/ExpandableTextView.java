@@ -814,9 +814,9 @@ public class ExpandableTextView extends AppCompatTextView {
                     String aimSrt = result.substring(result.indexOf("【{<") + 3, result.indexOf(">}】"));
                     String contentSrt = result.substring(result.indexOf("《（(") + 3, result.indexOf(")）》"));
                     String key = UUIDUtils.getUuid(aimSrt.length());
-                    datasMention.add(new FormatData.PositionData(newResult.length() + 1, newResult.length() + 6 + aimSrt.length(), aimSrt, contentSrt, LinkType.SELF));
+                    datasMention.add(new FormatData.PositionData(newResult.length(), newResult.length() + aimSrt.length(), aimSrt, contentSrt, LinkType.SELF));
                     convert.put(key, aimSrt);
-                    newResult.append(" " + key + " ");
+                    newResult.append(key);
                     temp = end;
                 }
             }
