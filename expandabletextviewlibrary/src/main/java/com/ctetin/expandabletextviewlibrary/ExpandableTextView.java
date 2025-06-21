@@ -70,7 +70,7 @@ public class ExpandableTextView extends AppCompatTextView {
     public static final String regexp_mention = "@[\\w\\p{InCJKUnifiedIdeographs}-]{1,26}";
     //匹配自定义链接的正则表达式
 //    public static final String self_regex = "\\[([\\w\\p{InCJKUnifiedIdeographs}-]*)]\\([\\w\\p{InCJKUnifiedIdeographs}-]*\\)";
-    public static final String self_regex = "\\[([^\\[]*)\\]\\(([^\\(]*)\\)";
+    public static final String self_regex = "【\\{<([^>]+)>\\}】《（\\(([^)]+)\\)）》";
 
     private TextPaint mPaint;
 
@@ -811,10 +811,10 @@ public class ExpandableTextView extends AppCompatTextView {
                 String result = matcher.group();
                 if (!TextUtils.isEmpty(result)) {
                     //解析数据
-                    String aimSrt = result.substring(result.indexOf("[") + 1, result.indexOf("]"));
-                    String contentSrt = result.substring(result.indexOf("(") + 1, result.indexOf(")"));
+                    String aimSrt = result.substring(result.indexOf("【{<") + 3, result.indexOf(">}】"));
+                    String contentSrt = result.substring(result.indexOf("《（(") + 3, result.indexOf(")）》"));
                     String key = UUIDUtils.getUuid(aimSrt.length());
-                    datasMention.add(new FormatData.PositionData(newResult.length() + 1, newResult.length() + 2 + aimSrt.length(), aimSrt, contentSrt, LinkType.SELF));
+                    datasMention.add(new FormatData.PositionData(newResult.length() + 1, newResult.length() + 6 + aimSrt.length(), aimSrt, contentSrt, LinkType.SELF));
                     convert.put(key, aimSrt);
                     newResult.append(" " + key + " ");
                     temp = end;
